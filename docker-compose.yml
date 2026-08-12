@@ -7,7 +7,7 @@ x-logging: &default-logging
 services:
   bot:
     container_name: beatdock
-    image: ghcr.io/albertgmz/beatdock:latest
+    image: ghcr.io/aleef-woo/beatdock:latest
     build:
       context: .
       dockerfile: Dockerfile

@@ -20,6 +20,7 @@ A Discord music bot powered by Lavalink. Simple to deploy, easy to use.
 - [Quick Start](#quick-start)
 - [Commands](#commands)
 - [Configuration](#configuration)
+- [Sync API](#sync-api-now-playing-for-external-apps)
 - [Managing the Bot](#managing-the-bot)
 - [Troubleshooting](#troubleshooting)
 - [Built With](#built-with)
@@ -278,6 +279,39 @@ All configuration is done through the `.env` file. Only `TOKEN` is required.
 | `PUBLIC_NODE_HOST_ALLOWLIST` | - | Optional comma-separated host or `*.domain` allowlist for public Lavalink fallback |
 | `QUEUE_EMPTY_DESTROY_MS` | `30000` | Disconnect after queue empties (ms) |
 | `EMPTY_CHANNEL_DESTROY_MS` | `60000` | Disconnect from empty channel (ms) |
+| `AUTOPLAY_TARGET_COUNT` | `25` | Tracks queued per autoplay refill |
+| `AUTOPLAY_MAX_SEEDS` | `3` | Recent tracks used to seed autoplay recommendations |
+| `SYNC_API_TOKEN` | - | Enables the [Sync API](#sync-api-now-playing-for-external-apps) when set (bearer token) |
+| `SYNC_API_PORT` | `8778` | Port the Sync API listens on |
+
+## Sync API (now-playing for external apps)
+
+BeatDock can expose a small **read-only** HTTP API with the current track and playback position, for external clients like a companion mobile app to display synced lyrics for whatever's playing in Discord. Disabled by default.
+
+**Enable it** by setting a bearer token in `.env`:
+
+```env
+SYNC_API_TOKEN=your_random_secret   # generate with: openssl rand -hex 32
+#SYNC_API_PORT=8778                 # default
+```
+
+Two routes, `GET` only:
+
+| Route | Auth | Returns |
+|---|---|---|
+| `/health` | none | `{"ok":true}` — liveness check |
+| `/now-playing` | `Authorization: Bearer <SYNC_API_TOKEN>` | Current track (cleaned title/artist, position, duration, artwork, etc.), or `{"active":false}` when nothing is playing |
+
+Optional `?guildId=<id>` pins the response to one server; without it, the bot auto-picks the currently-playing player (useful if it's only ever in one server, or you don't care which one answers).
+
+**Exposing it outside the Docker network:** the API isn't published to the host by default (`docker-compose.yml` only `expose`s the port internally). Put a reverse proxy in front of it that terminates TLS — the token is sent as a plain bearer header, so this must be HTTPS. If you're deploying with [Dokploy](https://dokploy.com), the bot service already joins `dokploy-network` so Traefik can route to it: add a **Domain** to the `bot` service pointed at container port `8778` (or your `SYNC_API_PORT`), then verify with:
+
+```bash
+curl https://your-domain/health
+curl -H "Authorization: Bearer $SYNC_API_TOKEN" https://your-domain/now-playing
+```
+
+This API is what powers lyric sync in the [FeelaSync](https://github.com/aleef-woo/feela-sync) companion app — see that repo's README for building and installing it.
 
 ## Managing the Bot
 

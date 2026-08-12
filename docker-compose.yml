@@ -17,6 +17,10 @@ services:
     networks:
       - beatdock-network
     env_file: .env
+    # Sync API (now-playing for the FeelaSync app). Network-internal only: publish it by
+    # attaching a Dokploy domain to this service on the same port so Traefik terminates TLS.
+    expose:
+      - "${SYNC_API_PORT:-8778}"
     restart: unless-stopped
     mem_limit: 512m
     pids_limit: 256

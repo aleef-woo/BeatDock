@@ -7,7 +7,8 @@ const PlayerController = require('./utils/PlayerController');
 const LavalinkConnectionManager = require('./utils/LavalinkConnectionManager');
 const PublicNodeProvider = require('./utils/PublicNodeProvider');
 const searchSessions = require('./utils/searchSessions');
-const { findAutoplayTracks } = require('./utils/autoplay');
+const { findAutoplayTracks, clearAutoplaySkips } = require('./utils/autoplay');
+const { startSyncServer } = require('./utils/syncServer');
 const {
     clearQueueEndTimeout,
     setQueueEndTimeout,
@@ -122,6 +123,7 @@ function cleanupGuildPlayer(client, guildId) {
     client.playerController.deletePlayer(guildId);
     client.activePlayers.delete(guildId);
     client.autoplayEnabled.delete(guildId);
+    clearAutoplaySkips(guildId);
     client.updatePresence();
 }
 
@@ -268,6 +270,11 @@ function setupShutdown(client) {
             client.healthcheckHeartbeat = null;
         }
 
+        if (client.syncServer) {
+            client.syncServer.close();
+            client.syncServer = null;
+        }
+
         client.publicNodeProvider?.destroy();
 
         searchSessions.destroy();
@@ -303,6 +310,7 @@ async function bootstrap() {
     setupShutdown(client);
     await client.login(process.env.TOKEN);
     client.healthcheckHeartbeat = startHealthcheckHeartbeat();
+    client.syncServer = startSyncServer(client);
 }
 
 process.on('unhandledRejection', (error) => {

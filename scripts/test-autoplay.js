@@ -2,10 +2,15 @@
 // Run: node scripts/test-autoplay.js  (exits non-zero on any failed assertion)
 
 const assert = require('node:assert/strict');
-const { normalizeString } = require('../src/utils/trackText');
+const { normalizeString, displayMetadata } = require('../src/utils/trackText');
 // Pin the target before loading autoplay — it reads AUTOPLAY_TARGET_COUNT at require time.
 process.env.AUTOPLAY_TARGET_COUNT = '25';
-const { findAutoplayTracks } = require('../src/utils/autoplay');
+const {
+    findAutoplayTracks,
+    recordAutoplaySkip,
+    getAutoplaySkips,
+    clearAutoplaySkips,
+} = require('../src/utils/autoplay');
 
 let passed = 0;
 function check(name, fn) {
@@ -130,6 +135,89 @@ async function main() {
         }
         // Distinct songs must NOT collapse.
         assert.notEqual(normalizeString('Video Games'), normalizeString('Games'), 'distinct titles must stay distinct');
+    });
+
+    // ── Scenario 6: skipped autoplay picks are filtered out of the next refill ──
+    await check('filters candidates the listener skipped', async () => {
+        const player = makePlayer({
+            previous: [],
+            mixes: { s6: [{ id: 'k1', title: 'Rejected' }, { id: 'k2', title: 'Kept' }] },
+        });
+        player.guildId = 'g6';
+        clearAutoplaySkips('g6');
+        recordAutoplaySkip('g6', track('k1', 'Rejected'));
+
+        const out = ids(await findAutoplayTracks(player, track('s6', 'Seed')));
+        assert.ok(!out.includes('k1'), 'skipped title must be excluded');
+        assert.ok(out.includes('k2'), 'unskipped candidates must survive');
+        clearAutoplaySkips('g6');
+    });
+
+    // ── Scenario 7: skip memory is per-guild and bounded ──
+    await check('skip memory is per-guild', async () => {
+        clearAutoplaySkips('gA');
+        clearAutoplaySkips('gB');
+        recordAutoplaySkip('gA', track('x', 'Only In A'));
+        assert.equal(getAutoplaySkips('gA').size, 1);
+        assert.equal(getAutoplaySkips('gB').size, 0);
+        clearAutoplaySkips('gA');
+    });
+
+    // ── Scenario 8: seeds interleave instead of one mix monopolising the batch ──
+    await check('interleaves candidates across seeds', async () => {
+        const seed = track('i1', 'Seed One');
+        const older = track('i2', 'Seed Two');
+        const player = makePlayer({
+            previous: [older],
+            mixes: {
+                i1: Array.from({ length: 20 }, (_, i) => ({ id: `p${i}`, title: `Primary ${i}` })),
+                i2: Array.from({ length: 20 }, (_, i) => ({ id: `q${i}`, title: `Secondary ${i}` })),
+            },
+        });
+
+        const first = ids(await findAutoplayTracks(player, seed)).slice(0, 6);
+        assert.ok(first.some((id) => id.startsWith('q')), `second seed must appear early, got ${first}`);
+    });
+
+    // ── Scenario 9: song-like/ISRC candidates win when variants collapse ──
+    await check('prefers the ISRC/song-entity copy of a duplicated recording', async () => {
+        const player = makePlayer({
+            previous: [],
+            mixes: {
+                s9: [
+                    { id: 'v1', title: 'Duplicated (Official Video)' },
+                    { id: 'v2', title: 'Duplicated', isrc: 'ISRC9', author: 'Artist - Topic' },
+                ],
+            },
+        });
+        const out = ids(await findAutoplayTracks(player, track('s9', 'Seed')));
+        assert.deepEqual(out, ['v2'], `expected the Art Track copy, got ${out}`);
+    });
+
+    // ── Scenario 10: metadata cleaning for the sync API / lyrics lookups ──
+    await check('displayMetadata cleans YouTube noise and passes clean sources through', async () => {
+        assert.deepEqual(
+            displayMetadata({
+                sourceName: 'youtube',
+                title: 'Some Artist - Some Song (Official Video)',
+                author: 'SomeArtistVEVO',
+            }),
+            { title: 'Some Song', artist: 'Some Artist' }
+        );
+
+        assert.deepEqual(
+            displayMetadata({
+                sourceName: 'youtube',
+                title: 'Some Song',
+                author: 'Some Artist - Topic',
+            }),
+            { title: 'Some Song', artist: 'Some Artist' }
+        );
+
+        assert.deepEqual(
+            displayMetadata({ sourceName: 'spotify', title: 'Some Song', author: 'Some Artist' }),
+            { title: 'Some Song', artist: 'Some Artist' }
+        );
     });
 
     console.log(`\n${passed} check(s) passed${process.exitCode ? ', with failures' : ''}.`);

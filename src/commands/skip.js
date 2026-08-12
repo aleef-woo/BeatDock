@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { requirePlayer } = require('../utils/interactionHelpers');
+const { noteAutoplaySkip } = require('../utils/autoplay');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -19,6 +20,8 @@ module.exports = {
         if (player.queue.tracks.length === 0 && !autoplayOn) {
             return interaction.reply({ content: client.languageManager.get(lang, 'QUEUE_EMPTY'), flags: MessageFlags.Ephemeral });
         }
+
+        noteAutoplaySkip(player);
 
         if (player.queue.tracks.length === 0 && autoplayOn) {
             await player.skip(0, false);

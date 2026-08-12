@@ -49,10 +49,39 @@ function splitArtistFromTitle(title, artist) {
     return { title, artist };
 }
 
+const YOUTUBE_SOURCES = new Set(['youtube', 'youtubemusic']);
+
+// Best-effort human title/artist for a Lavalink track. Non-YouTube sources (lavasrc
+// Spotify etc.) already carry clean metadata; YouTube carries a channel name as author
+// and marketing noise in the title, so it gets the full cleaning pass.
+function displayMetadata(info = {}) {
+    const rawTitle = info.title || '';
+    const rawAuthor = info.author || '';
+
+    if (!YOUTUBE_SOURCES.has(info.sourceName)) {
+        return { title: rawTitle.trim(), artist: rawAuthor.trim() };
+    }
+
+    const cleanedTitle = cleanTitle(rawTitle);
+    const cleanedArtist = cleanArtist(cleanAuthor(rawAuthor));
+
+    // "Artist - Topic" channels are auto-generated Art Tracks: the author IS the artist.
+    if (TOPIC_SUFFIX.test(rawAuthor)) {
+        return { title: cleanedTitle, artist: cleanedArtist };
+    }
+
+    const split = splitArtistFromTitle(cleanedTitle, cleanedArtist);
+    return {
+        title: cleanTitle(split.title).trim(),
+        artist: cleanArtist(split.artist).trim() || cleanedArtist,
+    };
+}
+
 module.exports = {
     normalizeString,
     cleanAuthor,
     cleanTitle,
     cleanArtist,
     splitArtistFromTitle,
+    displayMetadata,
 };

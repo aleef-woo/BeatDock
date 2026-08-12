@@ -5,6 +5,7 @@ const { handleFilterNavigation } = require('../interactions/filterNavigation');
 const { requirePlayer, requireSameVoice } = require('../utils/interactionHelpers');
 const { playPrevious, shuffleQueue, clearQueue, jumpToTrack, createPaginatedQueueResponse } = require('../utils/PlayerActions');
 const { clearGuildLifecycleTimers, schedulePlayerUpdate } = require('../utils/playerLifecycle');
+const { noteAutoplaySkip } = require('../utils/autoplay');
 const logger = require('../utils/logger');
 
 async function handlePlayerInteraction(interaction, action) {
@@ -43,9 +44,11 @@ async function handlePlayerInteraction(interaction, action) {
             if (player.queue.tracks.length === 0 && player.repeatMode === 'off' && !skipAutoplay) {
                 await interaction.reply({ content: client.languageManager.get(lang, 'QUEUE_EMPTY'), flags: MessageFlags.Ephemeral });
             } else if (player.queue.tracks.length === 0 && skipAutoplay) {
+                noteAutoplaySkip(player);
                 await player.skip(0, false);
                 await interaction.reply({ content: client.languageManager.get(lang, 'SONG_SKIPPED'), flags: MessageFlags.Ephemeral });
             } else {
+                noteAutoplaySkip(player);
                 await player.skip();
                 await interaction.reply({ content: client.languageManager.get(lang, 'SONG_SKIPPED'), flags: MessageFlags.Ephemeral });
             }

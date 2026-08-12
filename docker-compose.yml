@@ -16,9 +16,13 @@ services:
         condition: service_healthy
     networks:
       - beatdock-network
+      # Traefik lives on Dokploy's own network; the bot has to join it for a Dokploy
+      # domain to reach the sync API. Harmless when running compose outside Dokploy,
+      # as long as the network exists (see the note under `networks:`).
+      - dokploy-network
     env_file: .env
-    # Sync API (now-playing for the FeelaSync app). Network-internal only: publish it by
-    # attaching a Dokploy domain to this service on the same port so Traefik terminates TLS.
+    # Sync API (now-playing for the sync app). Not published on the host: attach a
+    # Dokploy domain to this service on this port so Traefik terminates TLS.
     expose:
       - "${SYNC_API_PORT:-8778}"
     restart: unless-stopped
@@ -109,3 +113,7 @@ services:
 networks:
   beatdock-network:
     name: beatdock_network
+  # Created by Dokploy on the host. Outside Dokploy, create it once with
+  # `docker network create dokploy-network` or drop it from the bot service.
+  dokploy-network:
+    external: true

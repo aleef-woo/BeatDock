@@ -188,52 +188,44 @@ class LavalinkConnectionManager {
                 throw new Error('Node creation failed - no node object returned');
             }
 
-            // Wait for connection with proper error handling
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    // Clean up event listeners before rejecting
-                    if (typeof newNode.off === 'function') {
-                        newNode.off('connect', onConnect);
-                        newNode.off('error', onError);
-                    }
-                    reject(new Error('Connection timeout'));
-                }, CONNECTION_TIMEOUT_MS);
+            // Node objects are not event emitters in lavalink-client; connect/error are
+            // emitted on the nodeManager with the node as the first argument.
+            const nodeManager = this.client.lavalink.nodeManager;
 
-                const onConnect = () => {
+            await new Promise((resolve, reject) => {
+                const cleanup = () => {
                     clearTimeout(timeout);
-                    // Clean up event listeners on success
-                    if (typeof newNode.off === 'function') {
-                        newNode.off('connect', onConnect);
-                        newNode.off('error', onError);
-                    }
+                    nodeManager.off('connect', onConnect);
+                    nodeManager.off('error', onError);
+                };
+
+                const onConnect = (node) => {
+                    if (node?.id !== newNode.id) return;
+                    cleanup();
                     resolve();
                 };
 
-                const onError = (error) => {
-                    clearTimeout(timeout);
-                    // Clean up event listeners on error
-                    if (typeof newNode.off === 'function') {
-                        newNode.off('connect', onConnect);
-                        newNode.off('error', onError);
-                    }
+                const onError = (node, error) => {
+                    if (node?.id !== newNode.id) return;
+                    cleanup();
                     reject(error);
                 };
 
-                // Check if the node has the event methods
-                if (typeof newNode.once === 'function') {
-                    newNode.once('connect', onConnect);
-                    newNode.once('error', onError);
-                } else {
-                    // If the node doesn't have event methods, wait a bit and check if it's connected
-                    setTimeout(() => {
-                        if (newNode.connected) {
-                            clearTimeout(timeout);
-                            resolve();
-                        } else {
-                            clearTimeout(timeout);
-                            reject(new Error('Node created but not connected'));
-                        }
-                    }, 2000);
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Connection timeout'));
+                }, CONNECTION_TIMEOUT_MS);
+
+                nodeManager.on('connect', onConnect);
+                nodeManager.on('error', onError);
+
+                // createNode() only registers the node; the websocket needs an explicit
+                // connect(). A rejection here is surfaced through the same cleanup path.
+                try {
+                    newNode.connect();
+                } catch (error) {
+                    cleanup();
+                    reject(error);
                 }
             });
 

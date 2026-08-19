@@ -13,8 +13,9 @@ plugins:
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
     clients:
-      - MUSIC             # ytmsearch / music catalog
-      - TVHTML5EMBEDDED   # non-SABR formats, no poToken; most reliable first hop
+      - MUSIC             # ytmsearch / music catalog (metadata only, no playback)
+      - TVHTML5_SIMPLY    # opus, no poToken, no cipher script; most reliable playback hop
+      - ANDROID_MUSIC     # opus fallback, credential-free
       - WEB               # arbitrary videos + RD mixes (needs poToken, pushed by pot-refresher)
       - WEBEMBEDDED       # embed / age-limited fallback (also uses poToken)
       - MWEB              # mobile web fallback

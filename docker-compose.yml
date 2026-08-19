@@ -53,6 +53,10 @@ services:
       - SPOTIFY_ENABLED=${SPOTIFY_ENABLED:-false}
       - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+      # Empty on the first boot: the plugin prints a device code to link a throwaway
+      # Google account, then logs a refresh token to paste into .env.
+      - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN:-}
+      - YOUTUBE_SKIP_OAUTH_INIT=${YOUTUBE_SKIP_OAUTH_INIT:-false}
       - JAVA_OPTS=-Xmx1g
     restart: unless-stopped
     mem_limit: 1.5g

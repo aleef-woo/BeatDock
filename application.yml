@@ -12,9 +12,18 @@ plugins:
     allowSearch: true
     allowDirectVideoIds: true
     allowDirectPlaylistIds: true
+    # The VPS egress IP is flagged by YouTube ("Sign in to confirm you're not a bot"),
+    # which no client mix or poToken clears. OAuth signs the requests as a real account.
+    # First boot logs a device code to link; paste the resulting refresh token below so
+    # restarts skip the flow. Use a throwaway Google account -- YouTube bans for this.
+    oauth:
+      enabled: true
+      refreshToken: "${YOUTUBE_REFRESH_TOKEN:}"
+      skipInitialization: ${YOUTUBE_SKIP_OAUTH_INIT:false}
     clients:
       - MUSIC             # ytmsearch / music catalog (metadata only, no playback)
-      - TVHTML5_SIMPLY    # opus, no poToken, no cipher script; most reliable playback hop
+      - TV                # only client that uses the OAuth token; playback only, no metadata
+      - TVHTML5_SIMPLY    # opus, no poToken, no cipher script; credential-free fallback
       - ANDROID_MUSIC     # opus fallback, credential-free
       - WEB               # arbitrary videos + RD mixes (needs poToken, pushed by pot-refresher)
       - WEBEMBEDDED       # embed / age-limited fallback (also uses poToken)
